@@ -12,7 +12,7 @@ my: mysqlscepserver-$(OSARCH)
 docker: mysqlscepserver-linux-amd64
 
 $(MYSQLSCEPSERVER):
-	GOOS=$(word 2,$(subst -, ,$@)) GOARCH=$(word 3,$(subst -, ,$(subst .exe,,$@))) go build $(LDFLAGS) -o $@ ./$<
+	GOOS=$(word 2,$(subst -, ,$@)) GOARCH=$(word 3,$(subst -, ,$(subst .exe,,$@))) go build $(LDFLAGS) -o $@ ./cmd
 
 %-$(VERSION).zip: %.exe
 	rm -f $@

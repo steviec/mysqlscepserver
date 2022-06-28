@@ -32,7 +32,7 @@ CREATE TABLE certificates (
         REFERENCES serials (serial),
 
     CHECK (SUBSTRING(certificate_pem FROM 1 FOR 27) = '-----BEGIN CERTIFICATE-----')
-    CHECK (name IS NULL OR name != '')
+    -- CHECK (name IS NULL OR name != '')  // cannot use; this is 8.0 syntax
 );
 
 CREATE TABLE ca_keys (

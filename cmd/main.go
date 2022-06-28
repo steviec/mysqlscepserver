@@ -15,19 +15,23 @@ import (
 	"github.com/micromdm/scep/v2/challenge"
 	"github.com/micromdm/scep/v2/depot"
 	scepserver "github.com/micromdm/scep/v2/server"
+
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 )
 
 var version string
 
 func main() {
 	var (
-		flDSN       = flag.String("dsn", "", "SQL data source name (connection string)")
-		flAPIKey    = flag.String("api", "", "API key for challenge API endpoints")
-		flChallenge = flag.String("challenge", "", "static challenge password (disables dynamic challenges")
+		flDSN       = flag.String("dsn", envString("SCEP_DSN", ""), "SQL data source name (connection string)")
+		flAPIKey    = flag.String("api", envString("SCEP_API_KEY", ""), "API key for challenge API endpoints")
+		flChallenge = flag.String("challenge", envString("SCEP_CHALLENGE", ""), "static challenge password (disables dynamic challenges")
 		flListen    = flag.String("listen", envString("SCEP_HTTP_LISTEN", ":8080"), "port to listen on")
 		flCAPass    = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flDebug     = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flVersion   = flag.Bool("version", false, "print version and exit")
+		flLambda    = flag.Bool("lambda", envBool("SCEP_LAMBDA"), "Run using a lambda")		
 	)
 	flag.Parse()
 
@@ -49,13 +53,13 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-
+		
 	mysqlDepot, err := NewMySQLDepot(*flDSN)
 	if err != nil {
 		lginfo.Log("err", err)
 		os.Exit(1)
 	}
-
+	
 	crt, key, err := mysqlDepot.CreateOrLoadCA([]byte(*flCAPass), 10, "ca", "scep", "US")
 	if err != nil {
 		lginfo.Log("err", err)
@@ -99,8 +103,20 @@ func main() {
 	// start http server
 	errs := make(chan error, 2)
 	go func() {
-		lginfo.Log("transport", "http", "listen", *flListen, "msg", "listening")
-		errs <- http.ListenAndServe(*flListen, mux)
+
+		if *flLambda {
+
+			// Proxies requests from the AWS API Gateway to go's http handlers
+			// https://github.com/awslabs/aws-lambda-go-api-proxy
+			//
+			// Note that the Gateway needs to have binary media support added through the `binaryMediaTypes` parameter.
+			// See this doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
+			lginfo.Log("transport", "http", "context", "lambda", "msg", "listening")
+			lambda.Start(httpadapter.NewV2(mux).ProxyWithContext)
+		} else {
+			lginfo.Log("transport", "http", "address", *flListen, "msg", "listening")
+			errs <- http.ListenAndServe(*flListen, mux)
+		}
 	}()
 	go func() {
 		c := make(chan os.Signal)
