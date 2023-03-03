@@ -69,7 +69,7 @@ func main() {
 	var signer scepserver.CSRSigner = depot.NewSigner(
 		mysqlDepot,
 		depot.WithAllowRenewalDays(0),
-		depot.WithValidityDays(3650),
+		depot.WithValidityDays(365 * 30),
 		depot.WithCAPass(*flCAPass),
 	)
 	if *flChallenge == "" {
